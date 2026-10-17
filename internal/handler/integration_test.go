@@ -44,7 +44,7 @@ func TestIntegration_Pipeline(t *testing.T) {
 	}
 
 	processor := processor.NewProcessor(httpClient, logger, apiUrl)
-	handler := handler.NewHandler(processor, tracer)
+	handler := handler.NewHandler(processor, tracer, 5*time.Second)
 
 	event := events.SQSEvent{
 		Records: []events.SQSMessage{

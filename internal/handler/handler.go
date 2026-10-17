@@ -4,17 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"lambda/internal/domain"
+	"lambda/internal/processor"
+	"time"
+
 	"github.com/aws/aws-lambda-go/events"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
-	"lambda/internal/domain"
-	"lambda/internal/processor"
 )
 
 type Handler struct {
 	messageProcessor processor.MessageProcessor
 	tracer           trace.Tracer
+	timeOut time.Duration
 }
 
 func (h *Handler) HandleSQSEvent(ctx context.Context, event events.SQSEvent) error {
@@ -30,6 +33,9 @@ func (h *Handler) HandleSQSEvent(ctx context.Context, event events.SQSEvent) err
 }
 
 func (h *Handler) processRecord(ctx context.Context, record events.SQSMessage) error {
+
+	ctx, cancel := context.WithTimeout(ctx, h.timeOut)
+    defer cancel()
 
 	carrier := SQSCarrier(record.MessageAttributes)
 	propagator := propagation.TraceContext{}
@@ -55,9 +61,10 @@ func (h *Handler) processRecord(ctx context.Context, record events.SQSMessage) e
 	return nil
 }
 
-func NewHandler(processor processor.MessageProcessor, tracer trace.Tracer) *Handler {
+func NewHandler(processor processor.MessageProcessor, tracer trace.Tracer, requestTimeout time.Duration) *Handler {
 	return &Handler{
 		messageProcessor: processor,
 		tracer:           tracer,
+		timeOut: requestTimeout,
 	}
 }

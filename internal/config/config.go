@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"time"
+	"strconv"
 )
 
 type Config struct {
 	ApiUrl url.URL
+	HandlerRequestTimeOut time.Duration
 }
 
 func NewConfig() (*Config, error) {
@@ -20,6 +23,20 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("invalid url for API_BASE_URL: %v", err)
 	}
 
-	return &Config{ApiUrl: *url}, nil
+	timeoutStr := os.Getenv("HANDLER_PROCESS_REQUEST_TIMEOUT")
+	if timeoutStr == "" {
+		return nil, fmt.Errorf("HANDLER_PROCESS_REQUEST_TIMEOUT is missing")
+	}
+
+	timeoutSeconds, err := strconv.Atoi(timeoutStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RECORD_TIMEOUT_SECONDS: %w", err)
+	}
+
+	timeoutDuration := time.Duration(timeoutSeconds) * time.Second
+
+	return &Config{
+		ApiUrl: *url,
+		HandlerRequestTimeOut: timeoutDuration,}, nil
 
 }

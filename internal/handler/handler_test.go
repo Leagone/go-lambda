@@ -2,11 +2,13 @@ package handler_test
 
 import (
 	"context"
-	"github.com/aws/aws-lambda-go/events"
-	"go.opentelemetry.io/otel"
 	"lambda/internal/domain"
 	"lambda/internal/handler"
 	"testing"
+	"time"
+
+	"github.com/aws/aws-lambda-go/events"
+	"go.opentelemetry.io/otel"
 )
 
 type MockProcessor struct {
@@ -34,7 +36,7 @@ func TestHandleSQSEvent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tracer := otel.Tracer("test")
 			processor := &MockProcessor{ReturnError: tc.mockError}
-			handler := handler.NewHandler(processor, tracer)
+			handler := handler.NewHandler(processor, tracer, 5*time.Second)
 			ctx := context.Background()
 			event := events.SQSEvent{
 				Records: []events.SQSMessage{

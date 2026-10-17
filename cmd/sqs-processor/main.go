@@ -46,7 +46,7 @@ func main() {
 	}
 
 	msgProcessor := processor.NewProcessor(httpClient, logger, &cfg.ApiUrl)
-	sqsHandler := handler.NewHandler(msgProcessor, tracer)
+	sqsHandler := handler.NewHandler(msgProcessor, tracer, cfg.HandlerRequestTimeOut)
 
 	lambda.Start(sqsHandler.HandleSQSEvent)
 }
