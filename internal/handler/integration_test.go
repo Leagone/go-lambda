@@ -38,12 +38,12 @@ func TestIntegration_Pipeline(t *testing.T) {
 	apiUrl, _ := url.Parse(mockAPIServer.URL)
 
 	tracer := otel.Tracer("test")
-	slog := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
-	processor := processor.NewProcessor(httpClient, slog, apiUrl)
+	processor := processor.NewProcessor(httpClient, logger, apiUrl)
 	handler := handler.NewHandler(processor, tracer)
 
 	event := events.SQSEvent{

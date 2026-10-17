@@ -36,10 +36,10 @@ func (tz *TimeZone) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	loc, err := time.LoadLocation(zoneName)
+	location, err := time.LoadLocation(zoneName)
 	if err != nil {
 		return err
 	}
-	tz.Location = loc
+	tz.Location = location
 	return nil
 }

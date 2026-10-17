@@ -20,13 +20,10 @@ type Handler struct {
 func (h *Handler) HandleSQSEvent(ctx context.Context, event events.SQSEvent) error {
 
 	for _, record := range event.Records {
-
 		err := h.processRecord(ctx, record)
-
 		if err != nil {
 			return fmt.Errorf("processing record failed: %w", err)
 		}
-
 	}
 
 	return nil
@@ -59,7 +56,6 @@ func (h *Handler) processRecord(ctx context.Context, record events.SQSMessage) e
 }
 
 func NewHandler(processor processor.MessageProcessor, tracer trace.Tracer) *Handler {
-
 	return &Handler{
 		messageProcessor: processor,
 		tracer:           tracer,

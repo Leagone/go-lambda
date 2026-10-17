@@ -32,7 +32,7 @@ func (m *MockHttpClient) Do(req *http.Request) (*http.Response, error) {
 func TestHttpProcessor_process(t *testing.T) {
 
 	ctx := context.Background()
-	slog := slog.New(slog.DiscardHandler)
+	logger := slog.New(slog.DiscardHandler)
 	testURL, _ := url.Parse("https://api.example.com")
 
 	tests := []struct {
@@ -61,7 +61,7 @@ func TestHttpProcessor_process(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 
-			processor := processor.NewProcessor(tc.mockClient, slog, testURL)
+			processor := processor.NewProcessor(tc.mockClient, logger, testURL)
 			event := domain.Event{
 				IPAddress: []byte{8, 8, 8, 8},
 			}

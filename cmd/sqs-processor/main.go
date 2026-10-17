@@ -39,13 +39,13 @@ func main() {
 	}
 
 	tracer := otel.Tracer("sqs-lambda")
-	slog := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	httpClient := &http.Client{
 		Timeout:   10 * time.Second,
 		Transport: otelhttp.NewTransport(http.DefaultTransport),
 	}
 
-	msgProcessor := processor.NewProcessor(httpClient, slog, &cfg.ApiUrl)
+	msgProcessor := processor.NewProcessor(httpClient, logger, &cfg.ApiUrl)
 	sqsHandler := handler.NewHandler(msgProcessor, tracer)
 
 	lambda.Start(sqsHandler.HandleSQSEvent)
