@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
+	"lambda/internal/config"
 	"lambda/internal/handler"
 	"lambda/internal/processor"
 	"lambda/internal/telemetry"
 	"log"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"time"
 
@@ -20,7 +20,6 @@ import (
 func main() {
 
 	ctx := context.Background()
-
 	shutdown, err := telemetry.InitTracer(ctx, "test-lambda")
 
 	if err != nil {
@@ -33,23 +32,20 @@ func main() {
 		}
 	}()
 
-	tracer := otel.Tracer("sqs-lambda")
+	cfg, err := config.NewConfig()
 
-	baseURL := os.Getenv("API_BASE_URL")
-
-	url, err := url.Parse(baseURL)
 	if err != nil {
-		log.Fatalf("invalid base url: %v", err)
-
+		log.Fatalf("failed to load lambda config %v", err)
 	}
 
+	tracer := otel.Tracer("sqs-lambda")
 	slog := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	httpClient := &http.Client{
 		Timeout:   10 * time.Second,
 		Transport: otelhttp.NewTransport(http.DefaultTransport),
 	}
 
-	msgProcessor := processor.NewProcessor(httpClient, slog, url)
+	msgProcessor := processor.NewProcessor(httpClient, slog, &cfg.ApiUrl)
 	sqsHandler := handler.NewHandler(msgProcessor, tracer)
 
 	lambda.Start(sqsHandler.HandleSQSEvent)
