@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"time"
 	"strconv"
+	"time"
 )
 
 type Config struct {
-	ApiUrl url.URL
+	ApiUrl                url.URL
 	HandlerRequestTimeOut time.Duration
 }
 
@@ -36,7 +36,7 @@ func NewConfig() (*Config, error) {
 	timeoutDuration := time.Duration(timeoutSeconds) * time.Second
 
 	return &Config{
-		ApiUrl: *url,
-		HandlerRequestTimeOut: timeoutDuration,}, nil
+		ApiUrl:                *url,
+		HandlerRequestTimeOut: timeoutDuration}, nil
 
 }

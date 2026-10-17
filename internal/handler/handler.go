@@ -17,7 +17,7 @@ import (
 type Handler struct {
 	messageProcessor processor.MessageProcessor
 	tracer           trace.Tracer
-	timeOut time.Duration
+	timeOut          time.Duration
 }
 
 func (h *Handler) HandleSQSEvent(ctx context.Context, event events.SQSEvent) error {
@@ -35,7 +35,7 @@ func (h *Handler) HandleSQSEvent(ctx context.Context, event events.SQSEvent) err
 func (h *Handler) processRecord(ctx context.Context, record events.SQSMessage) error {
 
 	ctx, cancel := context.WithTimeout(ctx, h.timeOut)
-    defer cancel()
+	defer cancel()
 
 	carrier := SQSCarrier(record.MessageAttributes)
 	propagator := propagation.TraceContext{}
@@ -65,6 +65,6 @@ func NewHandler(processor processor.MessageProcessor, tracer trace.Tracer, reque
 	return &Handler{
 		messageProcessor: processor,
 		tracer:           tracer,
-		timeOut: requestTimeout,
+		timeOut:          requestTimeout,
 	}
 }
