@@ -13,20 +13,11 @@ import (
 )
 
 type MockHttpClient struct {
-	ResponseStatusCode int
-	ResponseBody       string
-	Err                error
+	DoFunc func(req *http.Request) (*http.Response, error)
 }
 
 func (m *MockHttpClient) Do(req *http.Request) (*http.Response, error) {
-	if m.Err != nil {
-		return nil, m.Err
-	}
-
-	return &http.Response{
-		StatusCode: m.ResponseStatusCode,
-		Body:       io.NopCloser(bytes.NewBufferString(m.ResponseBody)),
-	}, nil
+	return m.DoFunc(req)
 }
 
 func TestHttpProcessor_process(t *testing.T) {
@@ -41,41 +32,70 @@ func TestHttpProcessor_process(t *testing.T) {
 		expectErr  bool
 	}{
 		{
-			name: "Processor succesfully return 200 and Location for given IP",
+			name: "Processor successfully returns 200 and Location for given IP",
 			mockClient: &MockHttpClient{
-				ResponseStatusCode: 200,
-				ResponseBody:       `{"ip":"81.110.173.213","country":"GB","city":"Woolwich","continent":"EU","location":{"latitude":51.4966,"longitude":0.0666,"accuracy_radius":10,"time_zone":"Europe/London"}}`,
+				DoFunc: func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: 200,
+						Body:       io.NopCloser(bytes.NewBufferString(`{"ip":"81.110.173.213","country":"GB","city":"Woolwich","continent":"EU","location":{"latitude":51.4966,"longitude":0.0666,"accuracy_radius":10,"time_zone":"Europe/London"}}`)),
+					}, nil
+				},
 			},
 			expectErr: false,
 		},
 		{
-			name: "Processor fails and returns 404",
+			name: "Processor fails and returns 400",
 			mockClient: &MockHttpClient{
-				ResponseStatusCode: 400,
-				ResponseBody:       `{"error": "ip not found"}`,
+				DoFunc: func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: 400,
+						Body:       io.NopCloser(bytes.NewBufferString(`{"error": "ip not found"}`)),
+					}, nil
+				},
 			},
 			expectErr: true,
+		},
+		{
+			name: "Processor retries on 500 and succeeds on attempt 3",
+			mockClient: &MockHttpClient{
+				DoFunc: func() func(req *http.Request) (*http.Response, error) {
+					attempts := 0
+					return func(req *http.Request) (*http.Response, error) {
+						attempts++
+						if attempts < 3 {
+							return &http.Response{
+								StatusCode: 500,
+								Body:       io.NopCloser(bytes.NewBufferString(`Internal Server Error`)),
+							}, nil
+						}
+						return &http.Response{
+							StatusCode: 200,
+							Body:       io.NopCloser(bytes.NewBufferString(`{"ip":"81.110.173.213","country":"GB","city":"Woolwich","continent":"EU","location":{"latitude":51.4966,"longitude":0.0666,"accuracy_radius":10,"time_zone":"Europe/London"}}`)),
+						}, nil
+					}
+				}(),
+			},
+			expectErr: false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 
-			processor := processor.NewProcessor(tc.mockClient, logger, testURL)
+			p := processor.NewProcessor(tc.mockClient, logger, testURL)
 			event := domain.Event{
-				IPAddress: []byte{8, 8, 8, 8},
+				IPAddress: []byte{81, 110, 173, 213},
 			}
 
-			err := processor.Process(ctx, event)
+			err := p.Process(ctx, event)
 
 			if tc.expectErr && err == nil {
 				t.Errorf("expected an error but got nil")
 			}
 			if !tc.expectErr && err != nil {
-				t.Errorf("did not expect error but got :%v", err)
+				t.Errorf("did not expect error but got: %v", err)
 			}
 
 		})
 	}
-
 }
