@@ -45,7 +45,7 @@ func main() {
 		Transport: otelhttp.NewTransport(http.DefaultTransport),
 	}
 
-	msgProcessor := processor.NewProcessor(httpClient, logger, &cfg.ApiUrl)
+	msgProcessor := processor.NewProcessor(httpClient, logger, cfg.ApiUrl)
 	sqsHandler := handler.NewHandler(msgProcessor, tracer, cfg.HandlerRequestTimeOut)
 
 	lambda.Start(sqsHandler.HandleSQSEvent)

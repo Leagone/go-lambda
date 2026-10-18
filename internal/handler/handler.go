@@ -20,16 +20,19 @@ type Handler struct {
 	timeOut          time.Duration
 }
 
-func (h *Handler) HandleSQSEvent(ctx context.Context, event events.SQSEvent) error {
+func (h *Handler) HandleSQSEvent(ctx context.Context, event events.SQSEvent) (events.SQSEventResponse, error) {
+    var response events.SQSEventResponse
 
-	for _, record := range event.Records {
-		err := h.processRecord(ctx, record)
-		if err != nil {
-			return fmt.Errorf("processing record failed: %w", err)
-		}
-	}
+    for _, record := range event.Records {
+        err := h.processRecord(ctx, record)
+        if err != nil {
+            response.BatchItemFailures = append(response.BatchItemFailures, events.SQSBatchItemFailure{
+                ItemIdentifier: record.MessageId,
+            })
+        }
+    }
 
-	return nil
+    return response, nil
 }
 
 func (h *Handler) processRecord(ctx context.Context, record events.SQSMessage) error {
