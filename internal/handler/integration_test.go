@@ -38,13 +38,14 @@ func TestIntegration_Pipeline(t *testing.T) {
 	apiUrl, _ := url.Parse(mockAPIServer.URL)
 
 	tracer := otel.Tracer("test")
+	meter := otel.Meter("test")
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
 	processor := processor.NewProcessor(httpClient, logger, apiUrl)
-	handler := handler.NewHandler(processor, tracer, 5*time.Second)
+	h := handler.NewHandler(processor, tracer, meter, 5*time.Second)
 
 	event := events.SQSEvent{
 		Records: []events.SQSMessage{
@@ -61,10 +62,13 @@ func TestIntegration_Pipeline(t *testing.T) {
 		},
 	}
 
-	err := handler.HandleSQSEvent(ctx, event)
+	resp, err := h.HandleSQSEvent(ctx, event)
 
 	if err != nil {
-		t.Errorf("handler pipeline failed: %v", err)
+		t.Fatalf("expected handler error to be nil, got: %v", err)
 	}
 
+	if len(resp.BatchItemFailures) > 0 {
+		t.Errorf("expected 0 batch item failures, got %d", len(resp.BatchItemFailures))
+	}
 }

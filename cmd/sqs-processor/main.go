@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
-	"lambda/internal/config"
-	"lambda/internal/handler"
-	"lambda/internal/processor"
-	"lambda/internal/telemetry"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"time"
+
+	"lambda/internal/config"
+	"lambda/internal/handler"
+	"lambda/internal/processor"
+	"lambda/internal/telemetry"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -18,10 +19,9 @@ import (
 )
 
 func main() {
-
 	ctx := context.Background()
-	shutdown, err := telemetry.InitTracer(ctx, "test-lambda")
 
+	shutdown, err := telemetry.InitTracer(ctx, "test-lambda")
 	if err != nil {
 		log.Fatalf("failed to initialize tracer: %v", err)
 	}
@@ -33,20 +33,22 @@ func main() {
 	}()
 
 	cfg, err := config.NewConfig()
-
 	if err != nil {
-		log.Fatalf("failed to load lambda config %v", err)
+		log.Fatalf("failed to load lambda config: %v", err)
 	}
 
 	tracer := otel.Tracer("sqs-lambda")
+	meter := otel.Meter("sqs-lambda")
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
 	httpClient := &http.Client{
 		Timeout:   10 * time.Second,
 		Transport: otelhttp.NewTransport(http.DefaultTransport),
 	}
 
 	msgProcessor := processor.NewProcessor(httpClient, logger, cfg.ApiUrl)
-	sqsHandler := handler.NewHandler(msgProcessor, tracer, cfg.HandlerRequestTimeOut)
+	sqsHandler := handler.NewHandler(msgProcessor, tracer, meter, cfg.HandlerRequestTimeOut)
 
 	lambda.Start(sqsHandler.HandleSQSEvent)
 }

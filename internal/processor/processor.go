@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 type HttpClient interface {
@@ -26,35 +28,46 @@ type HttpProcessor struct {
 }
 
 func (p *HttpProcessor) Process(ctx context.Context, event domain.Event) error {
+	spanCtx := trace.SpanContextFromContext(ctx)
+	traceID := spanCtx.TraceID().String()
+	spanID := spanCtx.SpanID().String()
+	ipStr := event.IPAddress.String()
 
-	reqUrl := p.baseUrl.JoinPath(event.IPAddress.String())
-
+	reqUrl := p.baseUrl.JoinPath(ipStr)
 	reqUrl.RawQuery = url.Values{
 		"fields": {"city,continent,location"},
 	}.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String(), nil)
-
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
 
-	p.log.InfoContext(ctx, "fetching location data for", "ip", event.IPAddress.String())
+	p.log.InfoContext(ctx, "fetching location data",
+		slog.String("trace_id", traceID),
+		slog.String("span_id", spanID),
+		slog.String("ip", ipStr),
+	)
 
 	var res *http.Response
-
 	maxRetries := 3
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		res, err = p.client.Do(req)
-		if err == nil && res.StatusCode != 500 {
+		if err == nil && res.StatusCode < 500 {
 			break
 		}
 		if res != nil {
 			res.Body.Close()
 		}
 
-		p.log.WarnContext(ctx, "transient error fetching location, retrying", "attempt", attempt+1, "error", err)
+		p.log.WarnContext(ctx, "transient error fetching location, retrying",
+			slog.String("trace_id", traceID),
+			slog.String("span_id", spanID),
+			slog.String("ip", ipStr),
+			slog.Int("attempt", attempt+1),
+			slog.Any("error", err),
+		)
 
 		backoff := time.Duration(1<<attempt) * time.Second
 
@@ -63,29 +76,34 @@ func (p *HttpProcessor) Process(ctx context.Context, event domain.Event) error {
 			return fmt.Errorf("context canceled during retry: %w", ctx.Err())
 		case <-time.After(backoff):
 		}
-
 	}
 
 	if err != nil {
-		return fmt.Errorf("executing request for IP %s: %w", event.IPAddress.String(), err)
+		return fmt.Errorf("executing request for IP %s: %w", ipStr, err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode >= 400 {
-		return fmt.Errorf("API error for IP %s: status %d", event.IPAddress.String(), res.StatusCode)
+		return fmt.Errorf("API error for IP %s: status %d", ipStr, res.StatusCode)
 	}
 
-	p.log.InfoContext(ctx, "retreived location data for", "ip", res.Status)
+	p.log.InfoContext(ctx, "retrieved location data",
+		slog.String("trace_id", traceID),
+		slog.String("span_id", spanID),
+		slog.String("ip", ipStr),
+		slog.String("status", res.Status),
+	)
 
 	var location domain.Location
-
 	if err := json.NewDecoder(res.Body).Decode(&location); err != nil {
-		return fmt.Errorf("decoding API response for IP %s: %w", event.IPAddress.String(), err)
+		return fmt.Errorf("decoding API response for IP %s: %w", ipStr, err)
 	}
 
 	p.log.InfoContext(ctx, "successfully decoded location data",
-		"ip", event.IPAddress.String(),
-		"location", location,
+		slog.String("trace_id", traceID),
+		slog.String("span_id", spanID),
+		slog.String("ip", ipStr),
+		slog.Any("location", location),
 	)
 
 	return nil
