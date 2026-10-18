@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type HttpClient interface {
@@ -40,7 +41,30 @@ func (p *HttpProcessor) Process(ctx context.Context, event domain.Event) error {
 
 	p.log.InfoContext(ctx, "fetching location data for", "ip", event.IPAddress.String())
 
-	res, err := p.client.Do(req)
+	var res *http.Response
+
+	maxRetries := 3
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		res, err = p.client.Do(req)
+		if err == nil && res.StatusCode != 500 {
+			break
+		}
+		if res != nil {
+			res.Body.Close()
+		}
+
+		p.log.WarnContext(ctx, "transient error fetching location, retrying", "attempt", attempt+1, "error", err)
+
+		backoff := time.Duration(1<<attempt) * time.Second
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled during retry: %w", ctx.Err())
+		case <-time.After(backoff):
+		}
+
+	}
 
 	if err != nil {
 		return fmt.Errorf("executing request for IP %s: %w", event.IPAddress.String(), err)
