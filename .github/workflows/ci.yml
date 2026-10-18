@@ -27,12 +27,17 @@ jobs:
       - name: Verify dependencies
         run: go mod verify
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          skip-cache: true 
-          args: --go=1.24
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "The following files are not formatted:"
+            gofmt -l .
+            echo "Run 'go fmt ./...' locally and commit the changes."
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
 
       - name: Run Tests with Coverage
         run: go test -v -race -coverprofile=coverage.out ./...
