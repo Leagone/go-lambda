@@ -10,6 +10,10 @@ jobs:
   test:
     name: Build and Test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.21', '1.22'] 
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -17,22 +21,46 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version: ${{ matrix.go-version }}
+          cache: true 
 
       - name: Verify dependencies
         run: go mod verify
 
-      - name: Check formatting
-        run: |
-          if [ -n "$(gofmt -l .)" ]; then
-            echo "The following files are not formatted:"
-            gofmt -l .
-            echo "Run 'go fmt ./...' locally and commit the changes."
-            exit 1
-          fi
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          skip-cache: true 
 
-      - name: Run go vet
-        run: go vet ./...
+      - name: Run Tests with Coverage
+        run: go test -v -race -coverprofile=coverage.out ./...
 
-      - name: Run Tests
-        run: go test -v -race ./...
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage-${{ matrix.go-version }}
+          path: coverage.out
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  security-scan:
+    name: CodeQL Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: go
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
